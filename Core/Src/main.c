@@ -20,6 +20,10 @@
 #include "main.h"
 #include "string.h"
 #include "usb_device.h"
+#include "usbd_hid.h"
+extern USBD_HandleTypeDef hUsbDeviceFS;
+
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -28,6 +32,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct {
+  uint8_t modifier;
+  uint8_t reserved;
+  uint8_t keycode[6];
+} KeyboardHIDReport;
 
 /* USER CODE END PTD */
 
@@ -74,6 +83,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ETH_Init(void);
 static void MX_USART3_UART_Init(void);
+static void SendKeyboardReport(KeyboardHIDReport *report);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -111,10 +121,11 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+ // MX_USB_DEVICE_Init();
   MX_GPIO_Init();
-  MX_ETH_Init();
+
   MX_USART3_UART_Init();
-  MX_USB_DEVICE_Init();
+
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -122,19 +133,34 @@ int main(void)
   char buffer[200];
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  sprintf(buffer, "Start usb keyboard あいうえおtest1\r\n", counter);
+  sprintf(buffer, "Start usb keyboard あいうえおtest1\r\n");
   HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+
+
+ // while(1){}
+
 
   while (1)
   {
-    /* USER CODE END WHILE */
-	   sprintf(buffer, "Counter: %lu\r\n", counter);
-	    HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+    KeyboardHIDReport report = {0};
 
-	    counter++;
-	    HAL_Delay(1000);  // 1秒待機
-    /* USER CODE BEGIN 3 */
+    // 'A' キーを押す
+    report.keycode[0] = 0x04;  // 'A' のHIDキーコード
+    SendKeyboardReport(&report);
+    HAL_Delay(50);  // デバウンス
+
+    // キーを離す
+    memset(&report, 0, sizeof(report));
+    SendKeyboardReport(&report);
+
+    sprintf(buffer, "Counter: %lu\r\n", counter);
+    HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+
+    counter++;
+    HAL_Delay(1000);  // 1秒待機
   }
+
+
   /* USER CODE END 3 */
 }
 
@@ -395,3 +421,11 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+static void SendKeyboardReport(KeyboardHIDReport *report)
+{
+  USBD_HID_SendReport(&hUsbDeviceFS, (uint8_t*)report, sizeof(KeyboardHIDReport));
+}
+
+
+
+
